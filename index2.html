@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code Scanner</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 20px;
+            background-color: #082E43; /* Dark blue background */
+            color: white; /* White text */
+        }
+        #cameraPreview {
+            width: 100%;
+            max-width: 500px;
+            height: auto;
+            margin: 20px auto;
+            border: 2px solid #ccc;
+            display: none; /* إخفاء الفيديو حتى يتم تشغيل الكاميرا */
+        }
+        #scanResult {
+            margin-top: 20px;
+            font-size: 18px;
+            color: white; /* White text */
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin-top: 20px;
+            background-color: #1C5A7D; /* Button background color */
+            color: white; /* Button text color */
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #2A7AA5; /* Button hover color */
+        }
+    </style>
+</head>
+<body>
+    <h1>QR Code Scanner</h1>
+    <button onclick="startCamera()">Start Camera</button>
+    <video id="cameraPreview" autoplay playsinline></video>
+    <div id="scanResult">Scanning...</div>
+    <button onclick="stopCamera()">Stop Camera</button>
+    <button onclick="restartCamera()" id="restartButton" style="display: none;">Restart Camera</button>
+
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script>
+        let videoElement = document.getElementById('cameraPreview');
+        let scanResultElement = document.getElementById('scanResult');
+        let restartButton = document.getElementById('restartButton');
+        let cameraStream = null;
+        let scanning = false;
+
+        async function startCamera() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                alert("Your device does not support camera access.");
+                return;
+            }
+
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: "environment",
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                });
+
+                videoElement.srcObject = cameraStream;
+                videoElement.style.display = "block"; // إظهار الكاميرا عند التشغيل
+                
+                // تأخير بسيط لإعطاء الكاميرا وقتًا للتركيز
+                setTimeout(() => {
+                    scanning = true;
+                    scanQRCode();
+                }, 1000);
+                
+            } catch (error) {
+                console.error("Error accessing camera:", error);
+                alert("Unable to access the camera. Please ensure you have granted permission.");
+            }
+        }
+
+        function scanQRCode() {
+            if (!scanning) return;
+            if (videoElement.videoWidth === 0 || videoElement.videoHeight === 0) {
+                requestAnimationFrame(scanQRCode);
+                return;
+            }
+
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = videoElement.videoWidth;
+            canvas.height = videoElement.videoHeight;
+            context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+
+            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: "dontInvert",
+            });
+
+            if (code) {
+                scanResultElement.innerText = "Scanned: " + code.data;
+            } else {
+                scanResultElement.innerText = "Scanning...";
+                requestAnimationFrame(scanQRCode);
+            }
+        }
+
+        function stopCamera() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+                videoElement.srcObject = null;
+                videoElement.style.display = "none"; // إخفاء الكاميرا عند الإيقاف
+                scanResultElement.innerText = "Camera stopped.";
+                scanning = false;
+                restartButton.style.display = "inline-block";
+            }
+        }
+
+        function restartCamera() {
+            startCamera();
+            restartButton.style.display = "none";
+        }
+    </script>
+</body>
+</html>
